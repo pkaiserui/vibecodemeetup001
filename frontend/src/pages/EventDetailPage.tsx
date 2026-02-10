@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import type { Event, Review, RSVP } from "../lib/types";
+import type { Event, Project, Review, RSVP } from "../lib/types";
 
 const formatDate = (value: string) =>
   new Date(value).toLocaleString(undefined, {
@@ -13,12 +13,16 @@ const formatDate = (value: string) =>
 
 export default function EventDetailPage() {
   const { eventId } = useParams();
-  const { isAuthed } = useAuth();
+  const { isAuthed, profile } = useAuth();
   const [event, setEvent] = useState<Event | null>(null);
   const [rsvp, setRsvp] = useState<RSVP | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
+  const [projectLink, setProjectLink] = useState("");
+  const [projectTitle, setProjectTitle] = useState("");
+  const [projectDescription, setProjectDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -28,12 +32,14 @@ export default function EventDetailPage() {
     setError(null);
 
     try {
-      const [eventData, reviewsData] = await Promise.all([
+      const [eventData, reviewsData, projectsData] = await Promise.all([
         apiFetch<Event>(`/events/${eventId}`),
         apiFetch<Review[]>(`/events/${eventId}/reviews`),
+        apiFetch<Project[]>(`/events/${eventId}/projects`),
       ]);
       setEvent(eventData);
       setReviews(reviewsData);
+      setProjects(projectsData);
 
       if (isAuthed) {
         try {
@@ -89,8 +95,8 @@ export default function EventDetailPage() {
     }
   };
 
-  const handleReview = async (event: FormEvent) => {
-    event.preventDefault();
+  const handleReview = async (e: FormEvent) => {
+    e.preventDefault();
     if (!eventId) return;
     try {
       const data = await apiFetch<Review>(`/events/${eventId}/reviews`, {
@@ -99,6 +105,27 @@ export default function EventDetailPage() {
       });
       setReviews((prev) => [data, ...prev.filter((review) => review.id !== data.id)]);
       setComment("");
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  };
+
+  const handleAddProject = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!eventId || !projectLink.trim()) return;
+    try {
+      const data = await apiFetch<Project>(`/events/${eventId}/projects`, {
+        method: "POST",
+        body: JSON.stringify({
+          link: projectLink.trim(),
+          title: projectTitle.trim() || null,
+          description: projectDescription.trim() || null,
+        }),
+      });
+      setProjects((prev) => [...prev, data]);
+      setProjectLink("");
+      setProjectTitle("");
+      setProjectDescription("");
     } catch (err) {
       setError((err as Error).message);
     }
@@ -130,6 +157,9 @@ export default function EventDetailPage() {
 
   const isFull = event.going_count >= event.capacity;
   const canReview = rsvp && (rsvp.status === "going" || rsvp.status === "checked_in");
+  const canAddProject = rsvp && rsvp.status === "checked_in";
+  const showProjectsSection = projects.length > 0 || canAddProject;
+  const isHost = isAuthed && profile && profile.id === event.organizer_id;
 
   return (
     <div className="page event-detail">
@@ -146,6 +176,11 @@ export default function EventDetailPage() {
           <p className="event-date">{formatDate(event.starts_at)}</p>
         </div>
         <div className="event-actions">
+          {isHost && (
+            <Link to={`/events/${eventId}/edit`} className="ghost-button">
+              Edit event
+            </Link>
+          )}
           {!isAuthed ? (
             <p className="muted">Sign in to RSVP or review.</p>
           ) : rsvp ? (
@@ -254,6 +289,78 @@ export default function EventDetailPage() {
               </div>
             )}
           </div>
+
+          {showProjectsSection && (
+            <div className="panel vibe-projects-panel">
+              <h2>This event&apos;s Vibe Coded projects</h2>
+              <p className="muted" style={{ marginBottom: "1rem" }}>
+                Links to GitHub repos or websites built during this event.
+              </p>
+              {canAddProject && (
+                <form className="vibe-project-form" onSubmit={handleAddProject}>
+                  <label className="field">
+                    Link (GitHub or website) <span className="create-required">*</span>
+                    <input
+                      type="url"
+                      value={projectLink}
+                      onChange={(e) => setProjectLink(e.target.value)}
+                      placeholder="https://github.com/..."
+                      required
+                    />
+                  </label>
+                  <label className="field">
+                    Title (optional)
+                    <input
+                      type="text"
+                      value={projectTitle}
+                      onChange={(e) => setProjectTitle(e.target.value)}
+                      placeholder="My cool project"
+                    />
+                  </label>
+                  <label className="field">
+                    Description (optional)
+                    <textarea
+                      value={projectDescription}
+                      onChange={(e) => setProjectDescription(e.target.value)}
+                      placeholder="What did you build?"
+                      rows={2}
+                    />
+                  </label>
+                  <button className="primary-button" type="submit">
+                    Add project
+                  </button>
+                </form>
+              )}
+              {projects.length === 0 ? (
+                canAddProject ? null : (
+                  <p className="muted">No projects shared yet. Check in to add yours!</p>
+                )
+              ) : (
+                <div className="vibe-project-list">
+                  {projects.map((project) => (
+                    <div key={project.id} className="vibe-project-card">
+                      <a
+                        href={project.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="vibe-project-link"
+                      >
+                        {project.title || project.link}
+                      </a>
+                      {project.description && (
+                        <p className="vibe-project-description">{project.description}</p>
+                      )}
+                      <p className="vibe-project-meta">
+                        by {project.display_name || "Anonymous"}
+                        {" · "}
+                        {new Date(project.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <aside className="event-side">

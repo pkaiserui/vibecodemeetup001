@@ -1,7 +1,9 @@
-import { useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 
+import EventCard from "../components/EventCard";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import type { RSVPWithEvent } from "../lib/types";
 
 export default function ProfilePage() {
   const { profile, refreshProfile } = useAuth();
@@ -11,6 +13,35 @@ export default function ProfilePage() {
   const [status, setStatus] = useState<string | null>(null);
   const [roleUserId, setRoleUserId] = useState("");
   const [roleValue, setRoleValue] = useState<"attendee" | "organizer" | "admin">("organizer");
+  const [rsvps, setRsvps] = useState<RSVPWithEvent[]>([]);
+
+  const loadRsvps = useCallback(async () => {
+    if (!profile) return;
+    try {
+      const data = await apiFetch<RSVPWithEvent[]>("/profiles/me/rsvps");
+      setRsvps(data);
+    } catch {
+      setRsvps([]);
+    }
+  }, [profile]);
+
+  useEffect(() => {
+    loadRsvps();
+  }, [loadRsvps]);
+
+  useEffect(() => {
+    if (profile) {
+      setDisplayName(profile.display_name);
+      setBio(profile.bio ?? "");
+      setAvatarUrl(profile.avatar_url ?? "");
+    }
+  }, [profile]);
+
+  const now = new Date();
+  const upcomingRsvps = rsvps.filter((r) => new Date(r.event.ends_at) >= now);
+  const pastAttendedRsvps = rsvps.filter(
+    (r) => r.rsvp_status === "checked_in" && new Date(r.event.ends_at) < now
+  );
 
   if (!profile) {
     return (
@@ -85,6 +116,36 @@ export default function ProfilePage() {
           </button>
         </form>
       </div>
+
+      {(upcomingRsvps.length > 0 || pastAttendedRsvps.length > 0) && (
+        <div className="profile-events-section">
+          {upcomingRsvps.length > 0 && (
+            <div className="profile-events-block">
+              <h2>Upcoming events</h2>
+              <p className="muted">Events you&apos;re RSVP&apos;d to or checked in.</p>
+              <div className="event-grid">
+                {upcomingRsvps.map((r) => (
+                  <div key={r.rsvp_id} className="profile-event-wrap">
+                    <span className="profile-rsvp-badge">{r.rsvp_status.replace("_", " ")}</span>
+                    <EventCard event={r.event} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {pastAttendedRsvps.length > 0 && (
+            <div className="profile-events-block">
+              <h2>Previously attended</h2>
+              <p className="muted">Events you checked in to.</p>
+              <div className="event-grid">
+                {pastAttendedRsvps.map((r) => (
+                  <EventCard key={r.rsvp_id} event={r.event} />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {profile.role === "admin" && (
         <div className="panel form" style={{ marginTop: "20px" }}>

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../lib/auth";
 
 export default function Header() {
-  const { isAuthed, authDisabled, profile, signOut } = useAuth();
+  const { isAuthed, authDisabled, signOut } = useAuth();
   const [isScrolled, setIsScrolled] = useState(false);
 
   useEffect(() => {
@@ -44,7 +44,7 @@ export default function Header() {
             DISCOVER
           </NavLink>
           <NavLink
-            to="/create"
+            to="/host"
             className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
           >
             <span className="nav-icon">🚀</span>
@@ -61,25 +61,19 @@ export default function Header() {
 
         <div className="auth-section">
           {isAuthed ? (
-            <div className="user-info">
-              <div className="user-meta">
-                <span className="user-role">{profile?.role?.toUpperCase() ?? "MEMBER"}</span>
-                <span className="user-name">{profile?.display_name ?? "USER"}</span>
-              </div>
-              <div className="user-actions">
-                {authDisabled && (
-                  <span className="dev-badge">
-                    <span className="pulse-dot"></span>
-                    DEV MODE
-                  </span>
-                )}
-                {!authDisabled && (
-                  <button className="btn-secondary" onClick={() => signOut()}>
-                    SIGN OUT
-                  </button>
-                )}
-              </div>
-            </div>
+            <>
+              {authDisabled && (
+                <span className="dev-badge">
+                  <span className="pulse-dot"></span>
+                  DEV MODE
+                </span>
+              )}
+              {!authDisabled && (
+                <button className="btn-secondary" onClick={() => signOut()}>
+                  SIGN OUT
+                </button>
+              )}
+            </>
           ) : (
             <Link to="/auth" className="btn-primary">
               <span className="btn-icon">🔑</span>

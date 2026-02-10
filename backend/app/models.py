@@ -32,6 +32,7 @@ class Profile(SQLModel, table=True):
     display_name: str
     bio: str = ""
     avatar_url: Optional[str] = None
+    location_zip: Optional[str] = None  # Preferred zip for event discovery sorting
     role: Role = Role.attendee
     created_at: datetime = Field(default_factory=lambda: datetime.utcnow())
 
@@ -43,6 +44,7 @@ class Event(SQLModel, table=True):
     location_type: LocationType
     location_name: Optional[str] = None
     address: Optional[str] = None
+    zip_code: Optional[str] = None  # For distance sorting (e.g. US 5-digit)
     meeting_url: Optional[str] = None
     starts_at: datetime
     ends_at: datetime
@@ -65,4 +67,16 @@ class Review(SQLModel, table=True):
     user_id: str = Field(foreign_key="profile.id")
     rating: int
     comment: str = ""
+    created_at: datetime = Field(default_factory=lambda: datetime.utcnow())
+
+
+class Project(SQLModel, table=True):
+    """Vibe Coded project: link (GitHub/website) with optional title & description."""
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    event_id: str = Field(foreign_key="event.id")
+    user_id: str = Field(foreign_key="profile.id")
+    link: str
+    title: Optional[str] = None
+    description: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.utcnow())

@@ -5,6 +5,7 @@ export type Event = {
   location_type: "in_person" | "online" | "hybrid";
   location_name?: string | null;
   address?: string | null;
+  zip_code?: string | null;
   meeting_url?: string | null;
   starts_at: string;
   ends_at: string;
@@ -30,4 +31,22 @@ export type Review = {
   rating: number;
   comment: string;
   created_at: string;
+};
+
+export type RSVPWithEvent = {
+  rsvp_id: string;
+  rsvp_status: "going" | "waitlist" | "checked_in";
+  rsvp_created_at: string;
+  event: Event;
+};
+
+export type Project = {
+  id: string;
+  event_id: string;
+  user_id: string;
+  link: string;
+  title?: string | null;
+  description?: string | null;
+  created_at: string;
+  display_name?: string | null;
 };

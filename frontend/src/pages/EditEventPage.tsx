@@ -1,15 +1,23 @@
-import { useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 
 import EventCreatePreview from "../components/EventCreatePreview";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import type { Event } from "../lib/types";
 
-export default function CreateEventPage() {
+const toDatetimeLocal = (iso: string) => {
+  const d = new Date(iso);
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
+export default function EditEventPage() {
+  const { eventId } = useParams();
   const { profile, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
+  const [event, setEvent] = useState<Event | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [locationType, setLocationType] = useState<
@@ -24,31 +32,55 @@ export default function CreateEventPage() {
   const [capacity, setCapacity] = useState(25);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
-  const handleSubmit = async (event: FormEvent) => {
-    event.preventDefault();
+  const loadEvent = useCallback(async () => {
+    if (!eventId) return;
+    try {
+      const data = await apiFetch<Event>(`/events/${eventId}`);
+      setEvent(data);
+      setTitle(data.title);
+      setDescription(data.description);
+      setLocationType(data.location_type);
+      setLocationName(data.location_name ?? "");
+      setAddress(data.address ?? "");
+      setZipCode(data.zip_code ?? "");
+      setMeetingUrl(data.meeting_url ?? "");
+      setStartsAt(toDatetimeLocal(data.starts_at));
+      setEndsAt(toDatetimeLocal(data.ends_at));
+      setCapacity(data.capacity);
+    } catch (err) {
+      setFetchError((err as Error).message);
+    }
+  }, [eventId]);
+
+  useEffect(() => {
+    loadEvent();
+  }, [loadEvent]);
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!eventId) return;
     setLoading(true);
     setError(null);
 
     try {
-      const payload = {
-        title,
-        description,
-        location_type: locationType,
-        location_name: locationName || null,
-        address: address || null,
-        zip_code: zipCode.trim() || null,
-        meeting_url: meetingUrl || null,
-        starts_at: new Date(startsAt).toISOString(),
-        ends_at: new Date(endsAt).toISOString(),
-        capacity,
-      };
-
-      const data = await apiFetch<Event>("/events", {
-        method: "POST",
-        body: JSON.stringify(payload),
+      await apiFetch<Event>(`/events/${eventId}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          title,
+          description,
+          location_type: locationType,
+          location_name: locationName || null,
+          address: address || null,
+          zip_code: zipCode.trim() || null,
+          meeting_url: meetingUrl || null,
+          starts_at: new Date(startsAt).toISOString(),
+          ends_at: new Date(endsAt).toISOString(),
+          capacity,
+        }),
       });
-      navigate(`/events/${data.id}`);
+      navigate(`/events/${eventId}`);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -73,16 +105,39 @@ export default function CreateEventPage() {
     return (
       <div className="page create-page">
         <div className="panel create-panel create-signin-prompt">
-          <h1 className="create-signin-title">Sign in to host an event</h1>
-          <p className="create-signin-subtitle">
-            Create an account or sign in to host your own vibe coding meetup.
-          </p>
-          <Link
-            to="/auth"
-            className="btn-primary create-signin-cta"
-          >
+          <h1 className="create-signin-title">Sign in to edit events</h1>
+          <Link to="/auth" className="btn-primary create-signin-cta">
             Sign in
           </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (fetchError || (event && event.organizer_id !== profile.id)) {
+    return (
+      <div className="page create-page">
+        <div className="panel create-panel">
+          <h1>Cannot edit this event</h1>
+          <p className="muted">
+            {fetchError ?? "Only the host can edit this event."}
+          </p>
+          <Link to={eventId ? `/events/${eventId}` : "/"} className="btn-primary" style={{ marginTop: "1rem", display: "inline-block" }}>
+            Back to event
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!event) {
+    return (
+      <div className="page create-page">
+        <div className="panel create-panel">
+          <div className="loading-state">
+            <div className="loading-spinner"></div>
+            <p className="loading-text">Loading event...</p>
+          </div>
         </div>
       </div>
     );
@@ -93,9 +148,9 @@ export default function CreateEventPage() {
       <div className="create-layout">
         <main className="create-form-column">
           <header className="create-header">
-            <h1 className="create-title">Create your event</h1>
+            <h1 className="create-title">Edit event</h1>
             <p className="create-subtitle">
-              Set the vibe, define the capacity, and see your invite take shape.
+              Update your event details.
             </p>
           </header>
 
@@ -252,13 +307,18 @@ export default function CreateEventPage() {
 
             {error && <p className="error create-error">{error}</p>}
 
-            <button
-              className="primary-button create-submit"
-              type="submit"
-              disabled={loading}
-            >
-              {loading ? "Creating..." : "Create event"}
-            </button>
+            <div className="create-form-actions">
+              <Link to={`/events/${eventId}`} className="ghost-button">
+                Cancel
+              </Link>
+              <button
+                className="primary-button create-submit"
+                type="submit"
+                disabled={loading}
+              >
+                {loading ? "Saving..." : "Save changes"}
+              </button>
+            </div>
           </form>
 
           <div className="create-preview-below">

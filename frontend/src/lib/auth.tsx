@@ -9,6 +9,7 @@ export type Profile = {
   display_name: string;
   bio: string;
   avatar_url?: string | null;
+  location_zip?: string | null;
   role: "attendee" | "organizer" | "admin";
   created_at: string;
 };
@@ -51,19 +52,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session ?? null);
-      setLoading(false);
-      if (data.session) {
-        loadProfile();
+      const sess = data.session ?? null;
+      setSession(sess);
+      if (!sess) {
+        setLoading(false);
+        return;
       }
+      loadProfile().finally(() => setLoading(false));
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
       if (newSession) {
-        loadProfile();
+        setLoading(true);
+        loadProfile().finally(() => setLoading(false));
       } else {
         setProfile(null);
+        setLoading(false);
       }
     });
 

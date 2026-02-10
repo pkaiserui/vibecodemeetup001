@@ -1,9 +1,11 @@
 import { useState, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../lib/auth";
 
 export default function AuthPage() {
   const { signIn, signUp, authDisabled } = useAuth();
+  const navigate = useNavigate();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -21,6 +23,8 @@ export default function AuthPage() {
     setLoading(false);
     if (message) {
       setError(message);
+    } else {
+      navigate("/");
     }
   };
 

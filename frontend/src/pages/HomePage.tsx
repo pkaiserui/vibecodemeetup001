@@ -2,14 +2,29 @@ import { useCallback, useEffect, useState } from "react";
 
 import EventCard from "../components/EventCard";
 import { apiFetch } from "../lib/api";
+import { useAuth } from "../lib/auth";
 import type { Event } from "../lib/types";
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+
 export default function HomePage() {
+  const { profile, refreshProfile } = useAuth();
   const [events, setEvents] = useState<Event[]>([]);
   const [query, setQuery] = useState("");
   const [locationType, setLocationType] = useState("");
+  const [nearZip, setNearZip] = useState<string | null>(null);
+  const [nearInput, setNearInput] = useState("");
+  const [nearExpanded, setNearExpanded] = useState(false);
+  const [nearLoading, setNearLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Use saved location from profile when logged in
+  useEffect(() => {
+    if (profile?.location_zip && profile.location_zip.length >= 5) {
+      setNearZip(profile.location_zip.slice(0, 5));
+    }
+  }, [profile?.location_zip]);
 
   const loadEvents = useCallback(async () => {
     setLoading(true);
@@ -17,6 +32,7 @@ export default function HomePage() {
     const params = new URLSearchParams();
     if (query) params.set("q", query);
     if (locationType) params.set("location_type", locationType);
+    if (nearZip) params.set("near", nearZip);
 
     try {
       const data = await apiFetch<Event[]>(`/events?${params.toString()}`);
@@ -26,7 +42,7 @@ export default function HomePage() {
     } finally {
       setLoading(false);
     }
-  }, [query, locationType]);
+  }, [query, locationType, nearZip]);
 
   useEffect(() => {
     loadEvents();
@@ -77,7 +93,7 @@ export default function HomePage() {
               <span className="btn-icon">🔍</span>
               FIND EVENTS
             </button>
-            <button className="btn-secondary" onClick={() => window.location.href = '/create'}>
+            <button className="btn-secondary" onClick={() => window.location.href = '/host'}>
               <span className="btn-icon">🚀</span>
               HOST EVENT
             </button>
@@ -115,6 +131,110 @@ export default function HomePage() {
               <option value="hybrid">HYBRID</option>
             </select>
 
+            <div className="near-location-control">
+              <button
+                type="button"
+                className={`ghost-button near-toggle ${nearZip ? "active" : ""}`}
+                onClick={() => setNearExpanded(!nearExpanded)}
+              >
+                📍 Nearest to location {nearZip ? `(${nearZip})` : ""}
+              </button>
+              {nearExpanded && (
+                <div className="near-options">
+                  <button
+                    type="button"
+                    className="ghost-button near-option-btn"
+                    disabled={nearLoading}
+                    onClick={async () => {
+                      setNearLoading(true);
+                      setError(null);
+                      try {
+                        const r = await fetch(`${API_BASE}/location/from-ip`);
+                        const data = await r.json();
+                        if (data.zip) {
+                          const zip = String(data.zip).slice(0, 5);
+                          setNearZip(zip);
+                          setNearExpanded(false);
+                          if (profile) {
+                            await apiFetch("/profiles/me", {
+                              method: "PUT",
+                              body: JSON.stringify({ location_zip: zip }),
+                            });
+                            await refreshProfile();
+                          }
+                        } else {
+                          setError(data.error || "Could not detect location");
+                        }
+                      } catch {
+                        setError("Could not detect location");
+                      } finally {
+                        setNearLoading(false);
+                      }
+                    }}
+                  >
+                    {nearLoading ? "Detecting..." : "Use my location (IP)"}
+                  </button>
+                  <div className="near-zip-row">
+                    <input
+                      className="search-input near-zip-input"
+                      placeholder="Or enter zip"
+                      value={nearInput}
+                      onChange={(e) => setNearInput(e.target.value)}
+                      maxLength={10}
+                    />
+                    <button
+                      type="button"
+                      className="primary-button"
+                      onClick={async () => {
+                        const z = nearInput.trim().replace(/\D/g, "").slice(0, 5);
+                        if (z.length >= 5) {
+                          setNearZip(z);
+                          setNearInput("");
+                          setNearExpanded(false);
+                          if (profile) {
+                            try {
+                              await apiFetch("/profiles/me", {
+                                method: "PUT",
+                                body: JSON.stringify({ location_zip: z }),
+                              });
+                              await refreshProfile();
+                            } catch {
+                              // Non-blocking; zip still applied locally
+                            }
+                          }
+                        }
+                      }}
+                    >
+                      Apply
+                    </button>
+                  </div>
+                  {nearZip && (
+                    <button
+                      type="button"
+                      className="ghost-button near-clear"
+                      onClick={async () => {
+                        setNearZip(null);
+                        setNearExpanded(false);
+                        if (profile) {
+                          try {
+                            await apiFetch("/profiles/me", {
+                              method: "PUT",
+                              body: JSON.stringify({ location_zip: "" }),
+                            });
+                            await refreshProfile();
+                          } catch {
+                            // Non-blocking
+                          }
+                        }
+                      }}
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
             <button className="btn-primary" onClick={loadEvents}>
               <span className="btn-icon">⚡</span>
               SEARCH
@@ -146,7 +266,7 @@ export default function HomePage() {
             <p className="empty-description">
               BE THE FIRST TO HOST A VIBE CODING MEETUP IN YOUR AREA.
             </p>
-            <button className="btn-primary" onClick={() => window.location.href = '/create'}>
+            <button className="btn-primary" onClick={() => window.location.href = '/host'}>
               <span className="btn-icon">🚀</span>
               CREATE EVENT
             </button>
