@@ -581,6 +581,20 @@ def get_my_rsvps(
     return result
 
 
+@app.post("/profiles/ensure", response_model=ProfileRead)
+def ensure_profile(profile: Profile = Depends(get_current_user)) -> ProfileRead:
+    """Ensure a profile row exists for the authenticated user. Creates one if missing."""
+    return ProfileRead(
+        id=profile.id,
+        display_name=profile.display_name,
+        bio=profile.bio,
+        avatar_url=profile.avatar_url,
+        location_zip=profile.location_zip,
+        role=profile.role,
+        created_at=profile.created_at,
+    )
+
+
 @app.get("/profiles/me", response_model=ProfileRead)
 def get_profile(profile: Profile = Depends(get_current_user)) -> ProfileRead:
     return ProfileRead(

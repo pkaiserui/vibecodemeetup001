@@ -34,6 +34,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const authDisabled = import.meta.env.VITE_AUTH_DISABLED === "true";
 
+  const ensureProfile = useCallback(async () => {
+    try {
+      const data = await apiFetch<Profile>("/profiles/ensure", { method: "POST" });
+      setProfile(data);
+    } catch (error) {
+      console.warn("Failed to ensure profile", error);
+    }
+  }, []);
+
   const loadProfile = useCallback(async () => {
     try {
       const data = await apiFetch<Profile>("/profiles/me");
@@ -81,15 +90,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (authDisabled) return "Auth is disabled in local mode.";
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return error.message;
+    // Explicitly ensure backend profile exists for this user
+    await ensureProfile();
     return null;
-  }, [authDisabled]);
+  }, [authDisabled, ensureProfile]);
 
   const signUp = useCallback(async (email: string, password: string) => {
     if (authDisabled) return "Auth is disabled in local mode.";
-    const { error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) return error.message;
+    // If session was created immediately (no email confirmation), ensure backend profile exists
+    if (data.session) {
+      await ensureProfile();
+    }
     return null;
-  }, [authDisabled]);
+  }, [authDisabled, ensureProfile]);
 
   const signOut = useCallback(async () => {
     if (authDisabled) return;

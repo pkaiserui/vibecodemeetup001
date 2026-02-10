@@ -1,3 +1,4 @@
+import logging
 import os
 from typing import Optional
 
@@ -8,6 +9,8 @@ from sqlmodel import Session
 
 from .db import get_session
 from .models import Profile, Role
+
+logger = logging.getLogger(__name__)
 
 security = HTTPBearer(auto_error=False)
 
@@ -24,7 +27,10 @@ DEFAULT_ROLE = os.getenv("DEFAULT_ROLE", "attendee")
 def _ensure_profile(session: Session, user_id: str, email: Optional[str]) -> Profile:
     profile = session.get(Profile, user_id)
     if profile:
+        logger.debug("Profile found for user %s", user_id)
         return profile
+
+    logger.info("Creating new profile for user %s (email=%s)", user_id, email)
 
     display_name = "New Member"
     if email and "@" in email:
@@ -43,6 +49,7 @@ def _ensure_profile(session: Session, user_id: str, email: Optional[str]) -> Pro
     session.add(profile)
     session.commit()
     session.refresh(profile)
+    logger.info("Profile created for user %s with role %s", user_id, role.value)
     return profile
 
 
