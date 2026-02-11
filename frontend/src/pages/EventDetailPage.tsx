@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 
-import { apiFetch } from "../lib/api";
+import { apiFetch, publicApiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import type { Event, Project, Review, RSVP } from "../lib/types";
 
@@ -55,10 +55,11 @@ export default function EventDetailPage() {
     setError(null);
 
     try {
+      // Use publicApiFetch for data that should be visible to everyone
       const [eventData, reviewsData, projectsData] = await Promise.all([
-        apiFetch<Event>(`/events/${eventId}`),
-        apiFetch<Review[]>(`/events/${eventId}/reviews`),
-        apiFetch<Project[]>(`/events/${eventId}/projects`),
+        publicApiFetch<Event>(`/events/${eventId}`),
+        publicApiFetch<Review[]>(`/events/${eventId}/reviews`),
+        publicApiFetch<Project[]>(`/events/${eventId}/projects`),
       ]);
       setEvent(eventData);
       setReviews(reviewsData);
@@ -257,7 +258,9 @@ export default function EventDetailPage() {
             </Link>
           )}
           {!isAuthed ? (
-            <p className="muted">Sign in to RSVP or review.</p>
+            <Link to="/auth" className="muted" style={{ textDecoration: "underline" }}>
+              Sign in to RSVP or review.
+            </Link>
           ) : rsvp ? (
             <>
               <div className={`status-pill ${rsvp.status}`}>
