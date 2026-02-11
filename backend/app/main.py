@@ -667,6 +667,25 @@ def get_profile(
     )
 
 
+@app.get("/profiles/{user_id}", response_model=ProfileRead)
+def get_profile_by_id(user_id: str, session: Session = Depends(get_session)) -> ProfileRead:
+    """Public profile view for any user. No auth required."""
+    profile = session.get(Profile, user_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    if not profile.avatar_url:
+        profile.avatar_url = _avatar_url_for_user(profile.id)
+    return ProfileRead(
+        id=profile.id,
+        display_name=profile.display_name,
+        bio=profile.bio,
+        avatar_url=profile.avatar_url,
+        location_zip=profile.location_zip,
+        role=profile.role,
+        created_at=profile.created_at,
+    )
+
+
 @app.put("/profiles/me", response_model=ProfileRead)
 def update_profile(
     payload: ProfileUpdate,

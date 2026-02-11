@@ -1,6 +1,7 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 
+import { useAuth } from "../lib/auth";
 import type { Event } from "../lib/types";
 
 const formatDate = (value: string) =>
@@ -25,19 +26,30 @@ const getStatusColor = (isFull: boolean, isPast: boolean) => {
 };
 
 export default function EventCard({ event }: { event: Event }) {
+  const { isAuthed } = useAuth();
+  const navigate = useNavigate();
   const [isHovered, setIsHovered] = useState(false);
   const isFull = event.going_count >= event.capacity;
   const isPast = new Date(event.ends_at) < new Date();
   const statusColor = getStatusColor(isFull, isPast);
 
   const capacityPct = event.capacity ? Math.min(100, (event.going_count / event.capacity) * 100) : 0;
+  const organizerName = event.organizer_display_name ?? "Organizer";
 
   return (
-    <Link
-      to={`/events/${event.id}`}
+    <div
+      role="link"
+      tabIndex={0}
       className={`event-card ${isHovered ? "hovered" : ""}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      onClick={() => navigate(`/events/${event.id}`)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          navigate(`/events/${event.id}`);
+        }
+      }}
     >
       <div className="event-card-accent" aria-hidden />
       <div className="event-card-bg">
@@ -90,15 +102,23 @@ export default function EventCard({ event }: { event: Event }) {
         </div>
 
         <footer className="event-card-footer">
-          <span className="event-card-host">
-            {event.organizer?.display_name || "Organizer"}
-          </span>
+          {isAuthed && event.organizer_id ? (
+            <Link
+              to={`/profiles/${event.organizer_id}`}
+              className="event-card-host event-card-host-link"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {organizerName}
+            </Link>
+          ) : (
+            <span className="event-card-host">{organizerName}</span>
+          )}
           <span className="event-card-cta">
             {isPast ? "View" : "Join"}
             <span className="event-card-cta-arrow" aria-hidden>→</span>
           </span>
         </footer>
       </div>
-    </Link>
+    </div>
   );
 }

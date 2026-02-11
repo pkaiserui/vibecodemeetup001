@@ -1071,6 +1071,15 @@ textarea {
   font-weight: 600;
   color: var(--neon-pink);
   text-transform: uppercase;
+}
+
+.event-card-host-link {
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.event-card-host-link:hover {
+  color: var(--neon-cyan);
   letter-spacing: 0.5px;
 }
 
@@ -1155,20 +1164,152 @@ textarea {
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 }
 
+/* Auth page — retro-futuristic terminal aesthetic */
 .auth-page {
   display: grid;
   place-items: center;
+  min-height: 60vh;
+  padding: var(--spacing-xl) var(--spacing-md);
 }
 
 .auth-card {
+  position: relative;
   max-width: 420px;
   width: 100%;
-  padding: 32px;
-  background: var(--bg-alt);
+  padding: var(--spacing-2xl) var(--spacing-xl);
+  background: linear-gradient(135deg, rgba(26, 26, 46, 0.98) 0%, rgba(15, 52, 96, 0.95) 100%);
+  border: 1px solid var(--border-primary);
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-dark), 0 0 40px rgba(0, 255, 255, 0.08);
   display: grid;
-  gap: 16px;
+  gap: var(--spacing-xl);
+  overflow: hidden;
+}
+
+.auth-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: linear-gradient(180deg, var(--neon-cyan), var(--neon-pink));
+  opacity: 0.8;
+  z-index: 1;
+}
+
+.auth-card::after {
+  content: '';
+  position: absolute;
+  top: -100%;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--neon-cyan), transparent);
+  opacity: 0.6;
+  animation: auth-scan 4s ease-in-out infinite;
+  z-index: 2;
+}
+
+@keyframes auth-scan {
+  0%, 100% { top: -10%; }
+  50% { top: 110%; }
+}
+
+.auth-page .page-title {
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  margin-bottom: var(--spacing-xs);
+  text-transform: uppercase;
+  letter-spacing: 3px;
+}
+
+.auth-page .page-subtitle {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-bottom: 0;
+}
+
+.auth-card .form {
+  display: grid;
+  gap: var(--spacing-lg);
+}
+
+.auth-card .field {
+  display: grid;
+  gap: var(--spacing-sm);
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.auth-card .field input {
+  background: rgba(10, 10, 15, 0.7);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  padding: 14px 16px;
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.auth-card .field input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.8;
+}
+
+.auth-card .field input:hover {
+  border-color: rgba(0, 255, 255, 0.5);
+}
+
+.auth-card .field input:focus {
+  outline: none;
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 12px rgba(0, 255, 255, 0.2);
+}
+
+.auth-card .primary-button {
+  background: linear-gradient(135deg, var(--neon-cyan) 0%, var(--neon-pink) 100%);
+  color: var(--bg-primary);
+  font-family: var(--font-display);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  padding: 14px 24px;
+  margin-top: var(--spacing-sm);
+  transition: box-shadow 0.25s ease, transform 0.2s ease;
+}
+
+.auth-card .primary-button:hover:not(:disabled) {
+  box-shadow: 0 6px 28px rgba(0, 255, 255, 0.45), 0 0 24px rgba(255, 0, 128, 0.2);
+  transform: translateY(-1px);
+}
+
+.auth-card .primary-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 255, 255, 0.4);
+}
+
+.auth-card .ghost-button {
+  background: transparent;
+  border: 1px solid var(--border-primary);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.auth-card .ghost-button:hover {
+  border-color: var(--neon-cyan);
+  color: var(--text-primary);
+}
+
+.auth-card .error {
+  color: var(--neon-pink);
+  font-size: 0.9rem;
+  padding: var(--spacing-sm);
+  background: rgba(255, 0, 128, 0.1);
+  border-radius: 8px;
+  border-left: 3px solid var(--neon-pink);
 }
 
 .event-detail {
@@ -2052,6 +2193,16 @@ textarea {
   border-radius: var(--radius);
   padding: var(--spacing-lg);
   box-shadow: var(--shadow-dark);
+}
+
+.profile-identity-card--view .profile-avatar-actions {
+  display: none;
+}
+
+.profile-bio {
+  margin-top: var(--spacing-md);
+  color: var(--text-secondary);
+  line-height: 1.6;
 }
 
 .profile-identity-row {

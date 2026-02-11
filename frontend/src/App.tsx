@@ -8,6 +8,7 @@ import EventDetailPage from "./pages/EventDetailPage";
 import HomePage from "./pages/HomePage";
 import NotFoundPage from "./pages/NotFoundPage";
 import ProfilePage from "./pages/ProfilePage";
+import ProfileViewPage from "./pages/ProfileViewPage";
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
           <Route path="/events/:eventId" element={<EventDetailPage />} />
           <Route path="/events/:eventId/edit" element={<EditEventPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/profiles/:userId" element={<ProfileViewPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </main>
