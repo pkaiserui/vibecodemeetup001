@@ -13,11 +13,21 @@ if DATABASE_URL.startswith("https://"):
         "not the Supabase API URL. Get the Postgres URL from Supabase: Project Settings → Database → Connection string."
     )
 
-connect_args = {}
+connect_args: dict = {}
+engine_kwargs: dict = {"echo": False}
+
 if DATABASE_URL.startswith("sqlite"):
     connect_args = {"check_same_thread": False}
+else:
+    # PostgreSQL connection pool tuning
+    engine_kwargs.update(
+        pool_size=5,         # Maintain 5 persistent connections
+        max_overflow=10,     # Allow up to 10 extra connections under load
+        pool_pre_ping=True,  # Verify connections are alive before use (avoids stale-connection errors)
+        pool_recycle=300,    # Recycle connections every 5 min to avoid server-side timeouts
+    )
 
-engine = create_engine(DATABASE_URL, echo=False, connect_args=connect_args)
+engine = create_engine(DATABASE_URL, connect_args=connect_args, **engine_kwargs)
 
 
 def init_db() -> None:

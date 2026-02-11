@@ -13,16 +13,58 @@
     <meta name="twitter:title" content="Vibe Coding Meetups" />
     <meta name="twitter:description" content="Discover hack nights, creative coding sessions, and builder meetups designed for real momentum." />
     <meta name="twitter:image" content="https://placehold.co/1200x630/1a1a2e/00ffff.png?text=Vibe+Coding&font=roboto" />
+
+    <!-- Preconnect to critical third-party origins (DNS + TCP + TLS early) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://ajax.googleapis.com" crossorigin />
+
+    <!-- DNS prefetch for less-critical origins (Supabase, placeholder images) -->
+    <link rel="dns-prefetch" href="https://placehold.co" />
+
+    <!--
+      Font loading strategy:
+      - Load only the primary UI font (JetBrains Mono) as render-blocking with display=swap
+      - Defer secondary display fonts (Orbitron, Audiowide, Fira Code) to after page load
+      This reduces render-blocking CSS from ~4 font families to 1.
+    -->
     <link
-      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=JetBrains+Mono:wght@300;400;500;600;700&family=Fira+Code:wght@300;400;500;600;700&family=Audiowide&display=swap"
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <script type="module" src="https://ajax.googleapis.com/ajax/libs/@googlemaps/extended-component-library/0.6.11/index.min.js"></script>
+    <link
+      rel="preload"
+      as="style"
+      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Fira+Code:wght@300;400;500;600;700&family=Audiowide&display=swap"
+      onload="this.onload=null;this.rel='stylesheet'"
+    />
+    <noscript>
+      <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Fira+Code:wght@300;400;500;600;700&family=Audiowide&display=swap"
+        rel="stylesheet"
+      />
+    </noscript>
+
+    <!--
+      Google Maps Extended Component Library: load async to avoid blocking render.
+      Moved to bottom of body and loaded lazily via dynamic import after page is interactive.
+    -->
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+
+    <!-- Lazy-load Google Maps library after the page becomes interactive -->
+    <script type="module">
+      if ("requestIdleCallback" in window) {
+        requestIdleCallback(() => {
+          import("https://ajax.googleapis.com/ajax/libs/@googlemaps/extended-component-library/0.6.11/index.min.js");
+        });
+      } else {
+        window.addEventListener("load", () => {
+          import("https://ajax.googleapis.com/ajax/libs/@googlemaps/extended-component-library/0.6.11/index.min.js");
+        });
+      }
+    </script>
   </body>
 </html>

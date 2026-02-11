@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import time
 from collections import Counter
 from datetime import datetime
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import requests
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from sqlalchemy import case
 from sqlmodel import Session, func, select
 
@@ -32,6 +35,39 @@ from .schemas import (
     ToolCountRead,
 )
 
+# ---------------------------------------------------------------------------
+# Simple in-memory TTL cache for read-heavy endpoints
+# ---------------------------------------------------------------------------
+_cache: Dict[str, Tuple[float, Any]] = {}
+
+
+def _cache_get(key: str, ttl: float) -> Any | None:
+    """Return cached value if it exists and hasn't expired, else None."""
+    entry = _cache.get(key)
+    if entry and (time.monotonic() - entry[0]) < ttl:
+        return entry[1]
+    return None
+
+
+def _cache_set(key: str, value: Any) -> None:
+    _cache[key] = (time.monotonic(), value)
+
+
+def _cache_invalidate(prefix: str) -> None:
+    """Invalidate all cache entries whose key starts with *prefix*."""
+    keys_to_delete = [k for k in _cache if k.startswith(prefix)]
+    for k in keys_to_delete:
+        del _cache[k]
+
+
+def _etag_for(data: Any) -> str:
+    """Generate a weak ETag from JSON-serialisable data."""
+    raw = json.dumps(data, sort_keys=True, default=str)
+    return f'W/"{hashlib.md5(raw.encode()).hexdigest()}"'
+
+
+# ---------------------------------------------------------------------------
+
 app = FastAPI(title="Vibe Coding Meetup API", version="0.1.0")
 
 
@@ -51,9 +87,12 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=_get_origins(),
     allow_credentials=True,
-    allow_methods=["*"] ,
-    allow_headers=["*"] ,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
+
+# GZip responses >= 500 bytes — reduces JSON payload size by ~70%
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 
 @app.get("/health")
@@ -62,11 +101,23 @@ def health() -> dict:
 
 
 @app.get("/config")
-def get_config() -> dict[str, Any]:
-    """Public config for the frontend (e.g. Google Places API key for address autocomplete)."""
-    return {
+def get_config(response: Response) -> dict[str, Any]:
+    """Public config for the frontend (e.g. Google Places API key for address autocomplete).
+
+    Cached for 5 minutes — config almost never changes at runtime.
+    """
+    cached = _cache_get("config", ttl=300)
+    if cached is not None:
+        response.headers["X-Cache"] = "HIT"
+        response.headers["Cache-Control"] = "public, max-age=300"
+        return cached
+    result = {
         "googlePlacesApiKey": os.getenv("GOOGLE_PLACE_API_KEY") or None,
     }
+    _cache_set("config", result)
+    response.headers["X-Cache"] = "MISS"
+    response.headers["Cache-Control"] = "public, max-age=300"
+    return result
 
 
 @app.get("/location/from-ip")
@@ -161,11 +212,26 @@ def _sort_events_near(events: list[Event], near_zip: str, session: Session) -> l
 
 @app.get("/events", response_model=List[EventRead])
 def list_events(
+    request: Request,
+    response: Response,
     session: Session = Depends(get_session),
     q: Optional[str] = Query(default=None),
     location_type: Optional[LocationType] = Query(default=None),
     near: Optional[str] = Query(default=None, description="Zip code for distance sorting"),
 ) -> List[EventRead]:
+    # Build a cache key from query params (short 10s TTL so data stays fresh)
+    cache_key = f"events:{q}:{location_type}:{near}"
+    cached = _cache_get(cache_key, ttl=10)
+    if cached is not None:
+        etag = _etag_for(cached)
+        if request.headers.get("if-none-match") == etag:
+            response.status_code = 304
+            return []  # type: ignore[return-value]
+        response.headers["ETag"] = etag
+        response.headers["Cache-Control"] = "public, max-age=10"
+        response.headers["X-Cache"] = "HIT"
+        return cached
+
     statement = select(Event)
     if q:
         like = f"%{q.lower()}%"
@@ -186,12 +252,20 @@ def list_events(
         near_zip = str(near).strip()[:5]
         if len(near_zip) >= 5:
             try:
-                return _sort_events_near(events, near_zip, session)
+                result = _sort_events_near(events, near_zip, session)
+                _cache_set(cache_key, result)
+                response.headers["Cache-Control"] = "public, max-age=10"
+                response.headers["X-Cache"] = "MISS"
+                return result
             except Exception:
                 # Fallback: distance sort failed (e.g. pgeocode on serverless); return default order
                 pass
 
-    return [_event_to_read(session, event) for event in events]
+    result = [_event_to_read(session, event) for event in events]
+    _cache_set(cache_key, result)
+    response.headers["Cache-Control"] = "public, max-age=10"
+    response.headers["X-Cache"] = "MISS"
+    return result
 
 
 @app.post("/events", response_model=EventRead)
@@ -221,6 +295,7 @@ def create_event(
     session.add(event)
     session.commit()
     session.refresh(event)
+    _cache_invalidate("events:")  # bust event list cache
     return _event_to_read(session, event)
 
 
@@ -273,6 +348,7 @@ def update_event(
     session.add(event)
     session.commit()
     session.refresh(event)
+    _cache_invalidate("events:")  # bust event list cache
     return _event_to_read(session, event)
 
 
