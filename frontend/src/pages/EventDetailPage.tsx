@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 
 import { apiFetch, publicApiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -211,8 +212,29 @@ export default function EventDetailPage() {
   const showProjectsSection = projects.length > 0 || canAddProject;
   const isHost = isAuthed && profile && profile.id === event.organizer_id;
 
+  const canonicalUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/events/${eventId}`
+      : `https://vibecodemeetup001-frontend.vercel.app/events/${eventId}`;
+  const ogDescription =
+    event.description.length > 160 ? `${event.description.slice(0, 157)}...` : event.description;
+  const ogImage = `https://placehold.co/1200x630/1a1a2e/00ffff?text=${encodeURIComponent(event.title)}`;
+
   return (
     <div className="page event-detail">
+      <Helmet>
+        <title>{event.title} | Vibe Coding Meetups</title>
+        <meta name="description" content={ogDescription} />
+        <meta property="og:title" content={event.title} />
+        <meta property="og:description" content={ogDescription} />
+        <meta property="og:image" content={ogImage} />
+        <meta property="og:url" content={canonicalUrl} />
+        <meta property="og:type" content="website" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={event.title} />
+        <meta name="twitter:description" content={ogDescription} />
+        <meta name="twitter:image" content={ogImage} />
+      </Helmet>
       <section className="event-hero">
         <div>
           <p className="event-kicker">
