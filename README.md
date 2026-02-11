@@ -64,5 +64,6 @@ npm run dev
 ## Vercel Deployment
 - Deploy `frontend/` as a Vercel project (React build).
 - Deploy `backend/` as a separate service (FastAPI) and point `VITE_API_BASE_URL` at it.
+- **Link previews (iMessage, etc.):** Ensure `VITE_API_BASE_URL` is set in Vercel to your production API URL so the Edge Middleware can fetch event data for crawlers.
 
 If you want everything in one Vercel project, I can convert the backend to Vercel serverless functions.
