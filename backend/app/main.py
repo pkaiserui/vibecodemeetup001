@@ -141,7 +141,7 @@ def _require_role(profile: Profile, allowed: list[Role]) -> None:
 
 def _sort_events_near(events: list[Event], near_zip: str, session: Session) -> list[EventRead]:
     """Sort: virtual first, then by distance from near_zip, then by starts_at (soonest first)."""
-    results: list[tuple[float, float, EventRead]] = []
+    results: list[tuple[float, float, float, EventRead]] = []
     virtual_first = 0.0
     no_zip_penalty = 1e9
     for event in events:
@@ -153,7 +153,8 @@ def _sort_events_near(events: list[Event], near_zip: str, session: Session) -> l
             primary, distance = 1.0, d if d is not None else no_zip_penalty
         else:
             primary, distance = 2.0, no_zip_penalty
-        results.append((primary, distance, event.starts_at.timestamp(), er))
+        ts = event.starts_at.timestamp() if event.starts_at else 0.0
+        results.append((primary, distance, ts, er))
     results.sort(key=lambda x: (x[0], x[1], x[2]))
     return [er for _, _, _, er in results]
 
@@ -184,7 +185,11 @@ def list_events(
     if near and near.strip():
         near_zip = str(near).strip()[:5]
         if len(near_zip) >= 5:
-            return _sort_events_near(events, near_zip, session)
+            try:
+                return _sort_events_near(events, near_zip, session)
+            except Exception:
+                # Fallback: distance sort failed (e.g. pgeocode on serverless); return default order
+                pass
 
     return [_event_to_read(session, event) for event in events]
 

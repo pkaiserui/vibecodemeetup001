@@ -12,9 +12,14 @@ def _get_nom():
     global _nom
     if _nom is None:
         try:
+            import os
+            # Vercel serverless has a read-only filesystem except /tmp.
+            # pgeocode respects PGEOCODE_DATA_DIR for its cache directory.
+            os.environ.setdefault("PGEOCODE_DATA_DIR", "/tmp/pgeocode")
             import pgeocode
             _nom = pgeocode.Nominatim("us")
-        except ImportError:
+        except Exception:
+            # ImportError, OSError, download failure, etc. — distance_km returns None.
             _nom = False  # Mark as tried-but-unavailable
     return _nom if _nom else None
 
