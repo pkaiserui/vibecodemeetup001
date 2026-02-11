@@ -45,7 +45,7 @@ export default async function middleware(req: Request) {
         : event.description
     );
     const canonicalUrl = `${origin}/events/${eventId}`;
-    const img = `${origin}/api/og?title=${encodeURIComponent(event.title)}`;
+    const img = `https://placehold.co/1200x630/1a1a2e/00ffff.png?text=${encodeURIComponent(event.title)}&font=roboto`;
 
     const meta = [
       `<title>${title} | Vibe Coding Meetups</title>`,

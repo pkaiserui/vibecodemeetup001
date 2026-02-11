@@ -218,7 +218,7 @@ export default function EventDetailPage() {
       : `https://vibecodemeetup001-frontend.vercel.app/events/${eventId}`;
   const ogDescription =
     event.description.length > 160 ? `${event.description.slice(0, 157)}...` : event.description;
-  const ogImage = `https://placehold.co/1200x630/1a1a2e/00ffff?text=${encodeURIComponent(event.title)}`;
+  const ogImage = `https://placehold.co/1200x630/1a1a2e/00ffff.png?text=${encodeURIComponent(event.title)}&font=roboto`;
 
   return (
     <div className="page event-detail">
