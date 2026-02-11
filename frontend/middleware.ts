@@ -45,27 +45,32 @@ export default async function middleware(req: Request) {
         : event.description
     );
     const canonicalUrl = `${origin}/events/${eventId}`;
-    const img = `https://placehold.co/1200x630/1a1a2e/00ffff?text=${encodeURIComponent(event.title)}`;
+    const img = `${origin}/api/og?title=${encodeURIComponent(event.title)}`;
 
     const meta = [
+      `<title>${title} | Vibe Coding Meetups</title>`,
+      `<meta name="description" content="${desc}">`,
       `<meta property="og:title" content="${title}">`,
       `<meta property="og:description" content="${desc}">`,
       `<meta property="og:image" content="${img}">`,
       `<meta property="og:url" content="${canonicalUrl}">`,
       `<meta property="og:type" content="website">`,
+      `<meta property="og:image:width" content="1200">`,
+      `<meta property="og:image:height" content="630">`,
       `<meta name="twitter:card" content="summary_large_image">`,
       `<meta name="twitter:title" content="${title}">`,
       `<meta name="twitter:description" content="${desc}">`,
       `<meta name="twitter:image" content="${img}">`,
-      `<title>${title} | Vibe Coding Meetups</title>`,
-      `<meta name="description" content="${desc}">`,
     ].join("\n    ");
 
     html = html.replace(
-      /<meta name="description"/,
-      `${meta}\n    <meta name="description"`
+      /<title>[\s\S]*?<\/title>|<meta\s+(name|property)="(description|og:[^"]*|twitter:[^"]*)"[^>]*\/?>/gi,
+      ""
     );
-    html = html.replace(/<title>[^<]+<\/title>/, `<title>${title} | Vibe Coding Meetups</title>`);
+    html = html.replace(
+      /<meta charset="UTF-8" \/>\s*<meta name="viewport"/,
+      `<meta charset="UTF-8" />\n    ${meta}\n    <meta name="viewport"`
+    );
   }
 
   return new Response(html, {
