@@ -30,83 +30,74 @@ export default function EventCard({ event }: { event: Event }) {
   const isPast = new Date(event.ends_at) < new Date();
   const statusColor = getStatusColor(isFull, isPast);
 
+  const capacityPct = event.capacity ? Math.min(100, (event.going_count / event.capacity) * 100) : 0;
+
   return (
     <Link
       to={`/events/${event.id}`}
-      className={`event-card ${isHovered ? 'hovered' : ''}`}
+      className={`event-card ${isHovered ? "hovered" : ""}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
+      <div className="event-card-accent" aria-hidden />
       <div className="event-card-bg">
-        <div className="event-card-scan"></div>
+        <div className="event-card-scan" aria-hidden />
       </div>
 
       <div className="event-card-content">
-        <div className="event-card-header">
-          <div className="event-type-badge">
-            <span className="event-type-icon">{getLocationIcon(event.location_type)}</span>
-            <span className="event-type-text">
-              {event.location_type === "in_person"
-                ? "IN PERSON"
-                : event.location_type === "online"
-                ? "ONLINE"
-                : "HYBRID"}
+        <header className="event-card-header">
+          <span className="event-card-format">
+            <span className="event-card-format-icon" aria-hidden>
+              {getLocationIcon(event.location_type)}
             </span>
-          </div>
-
-          <div className="event-status">
-            <div
-              className="status-indicator"
-              style={{ backgroundColor: statusColor }}
-            ></div>
-            <span className="status-text">
-              {isPast ? "COMPLETED" : isFull ? "FULL" : "OPEN"}
-            </span>
-          </div>
-        </div>
+            {event.location_type === "in_person" ? "In person" : event.location_type === "online" ? "Online" : "Hybrid"}
+          </span>
+          <span
+            className="event-card-status"
+            style={{ ["--status-color" as string]: statusColor }}
+          >
+            <span className="event-card-status-dot" />
+            {isPast ? "Completed" : isFull ? "Full" : "Open"}
+          </span>
+        </header>
 
         <div className="event-card-body">
-          <h3 className="event-title">{event.title}</h3>
-          <p className="event-description">{event.description}</p>
+          <h3 className="event-card-title">{event.title}</h3>
+          <p className="event-card-description">{event.description}</p>
 
-          <div className="event-details">
-            <div className="event-detail">
-              <span className="detail-icon">📅</span>
-              <span className="detail-text">{formatDate(event.starts_at)}</span>
-            </div>
-
-            <div className="event-detail">
-              <span className="detail-icon">📍</span>
-              <span className="detail-text">
-                {event.location_name || event.address || event.meeting_url || "LOCATION TBA"}
-              </span>
-            </div>
-
-            <div className="event-detail">
-              <span className="detail-icon">👥</span>
-              <span
-                className="detail-text"
-                style={{ color: statusColor }}
-              >
-                {event.going_count}/{event.capacity} ATTENDING
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="event-card-footer">
-          <div className="organizer-info">
-            <span className="organizer-label">HOSTED BY</span>
-            <span className="organizer-name">{event.organizer?.display_name || "ORGANIZER"}</span>
-          </div>
-
-          <div className="event-action">
-            <span className="action-text">
-              {isPast ? "VIEW DETAILS" : "JOIN EVENT"}
+          <div className="event-card-meta">
+            <span className="event-card-meta-item">
+              <span className="event-card-meta-icon" aria-hidden>📅</span>
+              {formatDate(event.starts_at)}
             </span>
-            <span className="action-arrow">→</span>
+            <span className="event-card-meta-item">
+              <span className="event-card-meta-icon" aria-hidden>📍</span>
+              {event.location_name || event.address || event.meeting_url || "Location TBA"}
+            </span>
+          </div>
+
+          <div className="event-card-capacity">
+            <span className="event-card-capacity-text">
+              {event.going_count}<span className="event-card-capacity-sep">/</span>{event.capacity}
+            </span>
+            <span className="event-card-capacity-bar-wrap">
+              <span
+                className="event-card-capacity-bar"
+                style={{ width: `${capacityPct}%` }}
+              />
+            </span>
           </div>
         </div>
+
+        <footer className="event-card-footer">
+          <span className="event-card-host">
+            {event.organizer?.display_name || "Organizer"}
+          </span>
+          <span className="event-card-cta">
+            {isPast ? "View" : "Join"}
+            <span className="event-card-cta-arrow" aria-hidden>→</span>
+          </span>
+        </footer>
       </div>
     </Link>
   );

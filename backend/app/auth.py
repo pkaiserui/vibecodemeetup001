@@ -1,10 +1,12 @@
 import logging
 import os
+import urllib.parse
 from typing import Optional
 
 import jwt
 from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jwt import PyJWKClient
 from sqlmodel import Session
 
 from .db import get_session
@@ -15,13 +17,27 @@ logger = logging.getLogger(__name__)
 security = HTTPBearer(auto_error=False)
 
 AUTH_DISABLED = os.getenv("AUTH_DISABLED", "false").lower() == "true"
-SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET", "")
+SUPABASE_JWKS_URL = os.getenv("SUPABASE_JWKS_URL", "").strip()
+SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET", "").strip()
+_jwks_client: Optional[PyJWKClient] = None
+
+if SUPABASE_JWKS_URL:
+    _jwks_client = PyJWKClient(SUPABASE_JWKS_URL, cache_keys=True)
+
 ADMIN_EMAILS = {
     email.strip().lower()
     for email in os.getenv("ADMIN_EMAILS", "").split(",")
     if email.strip()
 }
 DEFAULT_ROLE = os.getenv("DEFAULT_ROLE", "attendee")
+
+# DiceBear 9.x: deterministic fun avatars (lorelei = friendly illustrated)
+AVATAR_BASE = "https://api.dicebear.com/9.x/lorelei/svg"
+
+
+def _avatar_url_for_user(user_id: str) -> str:
+    """Generate a deterministic DiceBear avatar URL for the user."""
+    return f"{AVATAR_BASE}?seed={urllib.parse.quote(user_id, safe='')}"
 
 
 def _ensure_profile(session: Session, user_id: str, email: Optional[str]) -> Profile:
@@ -45,12 +61,33 @@ def _ensure_profile(session: Session, user_id: str, email: Optional[str]) -> Pro
     if email and email.lower() in ADMIN_EMAILS:
         role = Role.admin
 
-    profile = Profile(id=user_id, display_name=display_name, role=role)
+    avatar_url = _avatar_url_for_user(user_id)
+    profile = Profile(id=user_id, display_name=display_name, role=role, avatar_url=avatar_url)
     session.add(profile)
     session.commit()
     session.refresh(profile)
     logger.info("Profile created for user %s with role %s", user_id, role.value)
     return profile
+
+
+def _decode_jwt(token: str) -> dict:
+    """Decode and verify Supabase JWT using JWKS (ES256) or legacy secret (HS256)."""
+    if _jwks_client:
+        signing_key = _jwks_client.get_signing_key_from_jwt(token)
+        return jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["ES256"],
+            options={"verify_aud": False},
+        )
+    if SUPABASE_JWT_SECRET:
+        return jwt.decode(
+            token,
+            SUPABASE_JWT_SECRET,
+            algorithms=["HS256"],
+            options={"verify_aud": False},
+        )
+    raise ValueError("Neither SUPABASE_JWKS_URL nor SUPABASE_JWT_SECRET is configured")
 
 
 def get_current_user(
@@ -64,10 +101,10 @@ def get_current_user(
         email = x_user_email or "dev@local"
         return _ensure_profile(session, user_id, email)
 
-    if not SUPABASE_JWT_SECRET:
+    if not _jwks_client and not SUPABASE_JWT_SECRET:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="SUPABASE_JWT_SECRET is not configured",
+            detail="Set SUPABASE_JWKS_URL or SUPABASE_JWT_SECRET in .env",
         )
 
     if not credentials:
@@ -75,13 +112,8 @@ def get_current_user(
 
     token = credentials.credentials
     try:
-        payload = jwt.decode(
-            token,
-            SUPABASE_JWT_SECRET,
-            algorithms=["HS256"],
-            options={"verify_aud": False},
-        )
-    except jwt.PyJWTError:
+        payload = _decode_jwt(token)
+    except (jwt.PyJWTError, ValueError):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
     user_id = payload.get("sub")
@@ -99,7 +131,7 @@ def get_optional_user(
     if AUTH_DISABLED:
         return None
 
-    if not SUPABASE_JWT_SECRET:
+    if not _jwks_client and not SUPABASE_JWT_SECRET:
         return None
 
     if not credentials:
@@ -107,13 +139,8 @@ def get_optional_user(
 
     token = credentials.credentials
     try:
-        payload = jwt.decode(
-            token,
-            SUPABASE_JWT_SECRET,
-            algorithms=["HS256"],
-            options={"verify_aud": False},
-        )
-    except jwt.PyJWTError:
+        payload = _decode_jwt(token)
+    except (jwt.PyJWTError, ValueError):
         return None
 
     user_id = payload.get("sub")

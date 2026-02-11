@@ -9,3 +9,16 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+declare namespace JSX {
+  interface IntrinsicElements {
+    "gmpx-api-loader": React.DetailedHTMLProps<
+      React.HTMLAttributes<HTMLElement> & { apiKey?: string; "solution-channel"?: string },
+      HTMLElement
+    >;
+    "gmpx-place-picker": React.DetailedHTMLProps<
+      React.HTMLAttributes<HTMLElement> & { placeholder?: string; type?: string },
+      HTMLElement
+    >;
+  }
+}

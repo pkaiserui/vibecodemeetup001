@@ -49,7 +49,7 @@ export default function HomePage() {
   }, [loadEvents]);
 
   return (
-    <div className="page">
+    <div className="page discover-page">
       {/* Hero Section */}
       <section className="hero-section">
         <div className="hero-bg">

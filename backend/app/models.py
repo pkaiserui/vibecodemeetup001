@@ -71,7 +71,7 @@ class Review(SQLModel, table=True):
 
 
 class Project(SQLModel, table=True):
-    """Vibe Coded project: link (GitHub/website) with optional title & description."""
+    """Vibe Coded project: link (GitHub/website) with optional title, description, and tools used."""
 
     id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
     event_id: str = Field(foreign_key="event.id")
@@ -79,4 +79,5 @@ class Project(SQLModel, table=True):
     link: str
     title: Optional[str] = None
     description: Optional[str] = None
+    tools_used: Optional[str] = None  # JSON array of tool names, e.g. ["Vercel", "Cursor"]
     created_at: datetime = Field(default_factory=lambda: datetime.utcnow())

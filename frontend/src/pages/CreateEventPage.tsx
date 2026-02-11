@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
+import GooglePlacesAddress from "../components/GooglePlacesAddress";
+import DateTimePickerField from "../components/DateTimePickerField";
 import EventCreatePreview from "../components/EventCreatePreview";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "../lib/auth";
@@ -27,6 +29,10 @@ export default function CreateEventPage() {
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    if (!startsAt || !endsAt) {
+      setError("Please set both start and end date & time.");
+      return;
+    }
     setLoading(true);
     setError(null);
 
@@ -59,10 +65,11 @@ export default function CreateEventPage() {
   if (authLoading) {
     return (
       <div className="page create-page">
-        <div className="panel create-panel">
+        <div className="panel create-panel create-loading-panel">
+          <div className="create-accent create-signin-accent" aria-hidden />
           <div className="loading-state">
             <div className="loading-spinner"></div>
-            <p className="loading-text">Loading...</p>
+            <p className="loading-text">Loading…</p>
           </div>
         </div>
       </div>
@@ -73,6 +80,7 @@ export default function CreateEventPage() {
     return (
       <div className="page create-page">
         <div className="panel create-panel create-signin-prompt">
+          <div className="create-accent create-signin-accent" aria-hidden />
           <h1 className="create-signin-title">Sign in to host an event</h1>
           <p className="create-signin-subtitle">
             Create an account or sign in to host your own vibe coding meetup.
@@ -91,15 +99,18 @@ export default function CreateEventPage() {
   return (
     <div className="page create-page">
       <div className="create-layout">
-        <main className="create-form-column">
-          <header className="create-header">
-            <h1 className="create-title">Create your event</h1>
-            <p className="create-subtitle">
-              Set the vibe, define the capacity, and see your invite take shape.
-            </p>
-          </header>
+        <main className="create-form-column" aria-label="Event details form">
+          <div className="create-header-wrap">
+            <div className="create-accent" aria-hidden />
+            <header className="create-header">
+              <h1 className="create-title">Create your event</h1>
+              <p className="create-subtitle">
+                Set the vibe, define the capacity, and see your invite take shape.
+              </p>
+            </header>
+          </div>
 
-          <form className="create-form" onSubmit={handleSubmit}>
+          <form className="create-form create-form-panel" onSubmit={handleSubmit}>
             <div className="create-form-group">
               <label className="create-label" htmlFor="title">
                 Event title <span className="create-required">*</span>
@@ -182,12 +193,14 @@ export default function CreateEventPage() {
               <label className="create-label" htmlFor="address">
                 Address
               </label>
-              <input
+              <GooglePlacesAddress
                 id="address"
                 className="create-input"
-                type="text"
                 value={address}
-                onChange={(e) => setAddress(e.target.value)}
+                onChange={setAddress}
+                onSelect={(_addr, zip) => {
+                  if (zip) setZipCode(zip);
+                }}
                 placeholder="123 Main St, City, State"
               />
             </div>
@@ -221,47 +234,39 @@ export default function CreateEventPage() {
               />
             </div>
 
-            <div className="create-form-row">
-              <div className="create-form-group">
-                <label className="create-label" htmlFor="startsAt">
-                  Starts at <span className="create-required">*</span>
-                </label>
-                <input
-                  id="startsAt"
-                  className="create-input"
-                  type="datetime-local"
-                  value={startsAt}
-                  onChange={(e) => setStartsAt(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="create-form-group">
-                <label className="create-label" htmlFor="endsAt">
-                  Ends at <span className="create-required">*</span>
-                </label>
-                <input
-                  id="endsAt"
-                  className="create-input"
-                  type="datetime-local"
-                  value={endsAt}
-                  onChange={(e) => setEndsAt(e.target.value)}
-                  required
-                />
-              </div>
+            <div className="create-form-row create-form-row-datetime">
+              <DateTimePickerField
+                id="startsAt"
+                label="Starts at"
+                value={startsAt}
+                onChange={setStartsAt}
+                required
+                placeholder="Pick date & time"
+              />
+              <DateTimePickerField
+                id="endsAt"
+                label="Ends at"
+                value={endsAt}
+                onChange={setEndsAt}
+                required
+                placeholder="Pick date & time"
+                minDate={startsAt || null}
+                minDateTime={startsAt || null}
+              />
             </div>
 
-            {error && <p className="error create-error">{error}</p>}
+            {error && <p className="error create-error" role="alert">{error}</p>}
 
             <button
-              className="primary-button create-submit"
+              className="create-submit"
               type="submit"
               disabled={loading}
             >
-              {loading ? "Creating..." : "Create event"}
+              {loading ? "Creating…" : "Create event"}
             </button>
           </form>
 
-          <div className="create-preview-below">
+          <section className="create-preview-below" aria-label="Live preview">
             <EventCreatePreview
               title={title}
               description={description}
@@ -274,7 +279,7 @@ export default function CreateEventPage() {
               capacity={capacity}
               organizerName={profile.display_name}
             />
-          </div>
+          </section>
         </main>
       </div>
     </div>

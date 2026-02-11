@@ -24,6 +24,7 @@ type AuthContextValue = {
   signUp: (email: string, password: string) => Promise<string | null>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  ensureProfile: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -125,8 +126,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       signUp,
       signOut,
       refreshProfile: loadProfile,
+      ensureProfile,
     }),
-    [session, profile, isAuthed, authDisabled, loading, signIn, signUp, signOut, loadProfile]
+    [session, profile, isAuthed, authDisabled, loading, signIn, signUp, signOut, loadProfile, ensureProfile]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

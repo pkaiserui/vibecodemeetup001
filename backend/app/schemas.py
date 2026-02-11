@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
 from sqlmodel import SQLModel
 
@@ -65,6 +65,7 @@ class EventRead(SQLModel):
     ends_at: datetime
     capacity: int
     organizer_id: str
+    organizer_display_name: Optional[str] = None
     created_at: datetime
     going_count: int
     waitlist_count: int
@@ -101,6 +102,7 @@ class ProjectCreate(SQLModel):
     link: str
     title: Optional[str] = None
     description: Optional[str] = None
+    tools_used: Optional[List[str]] = None
 
 
 class ProjectRead(SQLModel):
@@ -110,8 +112,14 @@ class ProjectRead(SQLModel):
     link: str
     title: Optional[str]
     description: Optional[str]
+    tools_used: Optional[List[str]] = None
     created_at: datetime
     display_name: Optional[str] = None
+
+
+class ToolCountRead(SQLModel):
+    name: str
+    count: int
 
 
 class RSVPWithEventRead(SQLModel):

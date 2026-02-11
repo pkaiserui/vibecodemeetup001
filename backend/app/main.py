@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import os
+from collections import Counter
 from datetime import datetime
 from typing import Any, List, Optional
 
@@ -10,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import case
 from sqlmodel import Session, func, select
 
-from .auth import get_current_user
+from .auth import _avatar_url_for_user, get_current_user
 from .db import get_session, init_db
 from .geo import distance_km
 from .models import Event, LocationType, Profile, Project, Review, Role, RSVP, RSVPStatus
@@ -27,6 +29,7 @@ from .schemas import (
     RoleUpdate,
     RSVPRead,
     RSVPWithEventRead,
+    ToolCountRead,
 )
 
 app = FastAPI(title="Vibe Coding Meetup API", version="0.1.0")
@@ -56,6 +59,14 @@ app.add_middleware(
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok", "time": datetime.utcnow().isoformat()}
+
+
+@app.get("/config")
+def get_config() -> dict[str, Any]:
+    """Public config for the frontend (e.g. Google Places API key for address autocomplete)."""
+    return {
+        "googlePlacesApiKey": os.getenv("GOOGLE_PLACE_API_KEY") or None,
+    }
 
 
 @app.get("/location/from-ip")
@@ -101,6 +112,8 @@ def _event_counts(session: Session, event_id: str) -> tuple[int, int]:
 
 def _event_to_read(session: Session, event: Event) -> EventRead:
     going_count, waitlist_count = _event_counts(session, event.id)
+    organizer = session.get(Profile, event.organizer_id)
+    organizer_display_name = organizer.display_name if organizer else None
     return EventRead(
         id=event.id,
         title=event.title,
@@ -114,6 +127,7 @@ def _event_to_read(session: Session, event: Event) -> EventRead:
         ends_at=event.ends_at,
         capacity=event.capacity,
         organizer_id=event.organizer_id,
+        organizer_display_name=organizer_display_name,
         created_at=event.created_at,
         going_count=going_count,
         waitlist_count=waitlist_count,
@@ -482,19 +496,51 @@ def list_projects(event_id: str, session: Session = Depends(get_session)) -> Lis
         .order_by(Project.created_at)
     )
     rows = session.exec(statement).all()
-    return [
-        ProjectRead(
-            id=p.id,
-            event_id=p.event_id,
-            user_id=p.user_id,
-            link=p.link,
-            title=p.title,
-            description=p.description,
-            created_at=p.created_at,
-            display_name=creator.display_name,
+    result = []
+    for p, creator in rows:
+        tools_used = None
+        if p.tools_used:
+            try:
+                tools_used = json.loads(p.tools_used)
+            except (json.JSONDecodeError, TypeError):
+                pass
+        result.append(
+            ProjectRead(
+                id=p.id,
+                event_id=p.event_id,
+                user_id=p.user_id,
+                link=p.link,
+                title=p.title,
+                description=p.description,
+                tools_used=tools_used,
+                created_at=p.created_at,
+                display_name=creator.display_name,
+            )
         )
-        for p, creator in rows
-    ]
+    return result
+
+
+@app.get("/events/{event_id}/tool-counts", response_model=List[ToolCountRead])
+def list_event_tool_counts(event_id: str, session: Session = Depends(get_session)) -> List[ToolCountRead]:
+    """Aggregated counts of tools used across all projects for this event."""
+    event = session.get(Event, event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    statement = select(Project.tools_used).where(Project.event_id == event_id)
+    rows = session.exec(statement).all()
+    counter: Counter[str] = Counter()
+    for (tools_used,) in rows:
+        if not tools_used:
+            continue
+        try:
+            names = json.loads(tools_used)
+            if isinstance(names, list):
+                for t in names:
+                    if isinstance(t, str) and t.strip():
+                        counter[t.strip()] += 1
+        except (json.JSONDecodeError, TypeError):
+            pass
+    return [ToolCountRead(name=name, count=count) for name, count in counter.most_common()]
 
 
 @app.post("/events/{event_id}/projects", response_model=ProjectRead)
@@ -514,16 +560,30 @@ def create_project(
             status_code=403,
             detail="You must be checked in to add a Vibe Coded project",
         )
+    tools_used_json = None
+    if payload.tools_used:
+        names = [str(t).strip() for t in payload.tools_used if t and str(t).strip()]
+        if names:
+            tools_used_json = json.dumps(names)
+
     project = Project(
         event_id=event_id,
         user_id=profile.id,
         link=payload.link.strip(),
         title=payload.title.strip() if payload.title else None,
         description=payload.description.strip() if payload.description else None,
+        tools_used=tools_used_json,
     )
     session.add(project)
     session.commit()
     session.refresh(project)
+
+    tools_used = None
+    if project.tools_used:
+        try:
+            tools_used = json.loads(project.tools_used)
+        except (json.JSONDecodeError, TypeError):
+            pass
     return ProjectRead(
         id=project.id,
         event_id=project.event_id,
@@ -531,6 +591,7 @@ def create_project(
         link=project.link,
         title=project.title,
         description=project.description,
+        tools_used=tools_used,
         created_at=project.created_at,
     )
 
@@ -553,23 +614,7 @@ def get_my_rsvps(
     rows = session.exec(statement).all()
     result = []
     for rsvp, event in rows:
-        going_count, waitlist_count = _event_counts(session, event.id)
-        event_read = EventRead(
-            id=event.id,
-            title=event.title,
-            description=event.description,
-            location_type=event.location_type,
-            location_name=event.location_name,
-            address=event.address,
-            meeting_url=event.meeting_url,
-            starts_at=event.starts_at,
-            ends_at=event.ends_at,
-            capacity=event.capacity,
-            organizer_id=event.organizer_id,
-            created_at=event.created_at,
-            going_count=going_count,
-            waitlist_count=waitlist_count,
-        )
+        event_read = _event_to_read(session, event)
         result.append(
             RSVPWithEventRead(
                 rsvp_id=rsvp.id,
@@ -596,7 +641,16 @@ def ensure_profile(profile: Profile = Depends(get_current_user)) -> ProfileRead:
 
 
 @app.get("/profiles/me", response_model=ProfileRead)
-def get_profile(profile: Profile = Depends(get_current_user)) -> ProfileRead:
+def get_profile(
+    session: Session = Depends(get_session),
+    profile: Profile = Depends(get_current_user),
+) -> ProfileRead:
+    # Lazy-fill avatar for existing profiles that never had one
+    if not profile.avatar_url:
+        profile.avatar_url = _avatar_url_for_user(profile.id)
+        session.add(profile)
+        session.commit()
+        session.refresh(profile)
     return ProfileRead(
         id=profile.id,
         display_name=profile.display_name,

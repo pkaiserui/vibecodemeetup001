@@ -58,6 +58,9 @@ npm run dev
 - Add your email to `ADMIN_EMAILS` so your first login becomes `admin`.
 - Admins can promote other users on the Profile page.
 
+## Avatars
+- Profiles get a deterministic fun avatar ([DiceBear](https://www.dicebear.com/) lorelei style) by default; the URL is stored in the profile. You can override it with a custom Avatar URL on the Profile page.
+
 ## Vercel Deployment
 - Deploy `frontend/` as a Vercel project (React build).
 - Deploy `backend/` as a separate service (FastAPI) and point `VITE_API_BASE_URL` at it.

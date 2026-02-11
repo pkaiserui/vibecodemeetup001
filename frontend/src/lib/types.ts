@@ -11,6 +11,7 @@ export type Event = {
   ends_at: string;
   capacity: number;
   organizer_id: string;
+  organizer_display_name?: string | null;
   created_at: string;
   going_count: number;
   waitlist_count: number;
@@ -47,6 +48,12 @@ export type Project = {
   link: string;
   title?: string | null;
   description?: string | null;
+  tools_used?: string[] | null;
   created_at: string;
   display_name?: string | null;
+};
+
+export type ToolCount = {
+  name: string;
+  count: number;
 };
